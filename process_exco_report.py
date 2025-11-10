@@ -8,7 +8,7 @@ import re
 from functools import lru_cache
 from bs4 import BeautifulSoup
 import pandas as pd
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.chart import BarChart, PieChart, Reference
@@ -20,6 +20,7 @@ REPORT_TEMPLATE_FILE = '/Users/satyasagardandela/Downloads/monthly Reporting/rep
 SII_TEMPLATE_FILE = '/Users/satyasagardandela/Downloads/monthly Reporting/SII.htm'
 ADDITIONAL_HTML_FILE = '/Users/satyasagardandela/Downloads/monthly Reporting/Copy of 20251105_ECAG 2 Reporting.htm'
 FORMAT_TEMPLATE_FILE = '/Users/satyasagardandela/Downloads/monthly Reporting/1.htm'
+FORMAT_TEMPLATE_WORKBOOK = '/Users/satyasagardandela/Downloads/monthly Reporting/EXCOs Reporting October 2025.xlsx'
 
 MANUAL_SII_IDS = {
     '2023-002_F07-A01',
@@ -63,7 +64,32 @@ def sanitize_excel_value(value, is_date=False):
     # Remove control characters except tab, newline, and carriage return
     # Excel allows: \t, \n, \r
     value_str = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F]', '', value_str)
+    value_str = _fix_common_spellings(value_str)
     return value_str
+
+
+def _fix_common_spellings(text):
+    """Apply known spelling corrections and restore missing umlauts."""
+    if not text:
+        return text
+
+    def _replace_borse(match):
+        original = match.group(0)
+        upper = original.isupper()
+        capitalized = original[0].isupper()
+        replacement = 'BÖRSE' if upper else 'Börse' if capitalized else 'börse'
+        return replacement
+
+    def _replace_bohm(match):
+        original = match.group(0)
+        upper = original.isupper()
+        capitalized = original[0].isupper()
+        replacement = 'BÖHM' if upper else 'Böhm' if capitalized else 'böhm'
+        return replacement
+
+    text = re.sub(r'(?i)br\s*se', _replace_borse, text)
+    text = re.sub(r'(?i)bhm', _replace_bohm, text)
+    return text
 
 def beautify_text(text):
     if text is None:
@@ -209,6 +235,79 @@ def _normalize_header_key(header):
     if header is None:
         return ''
     return re.sub(r'\s+', ' ', str(header)).strip().lower()
+
+
+@lru_cache(maxsize=None)
+def get_xlsx_template_styles():
+    """Extract formatting metadata from the Excel template workbook."""
+    metadata = {
+        'column_widths_by_header': {},
+        'column_widths_by_letter': {},
+        'header_height': None,
+        'data_height': None,
+        'header_font': None,
+        'data_font': None,
+        'header_alignment': None,
+        'data_alignment': None,
+        'header_fill': None,
+    }
+
+    if not FORMAT_TEMPLATE_WORKBOOK:
+        return metadata
+
+    try:
+        wb = load_workbook(FORMAT_TEMPLATE_WORKBOOK, data_only=True)
+        if 'ECAG open Recos' not in wb.sheetnames:
+            return metadata
+
+        ws = wb['ECAG open Recos']
+
+        # Column widths by header/letter
+        header_row = ws[1] if ws.max_row >= 1 else []
+        for cell in header_row:
+            header_value = cell.value.strip() if isinstance(cell.value, str) else cell.value
+            if header_value:
+                width = ws.column_dimensions[cell.column_letter].width
+                if width:
+                    metadata['column_widths_by_header'][_normalize_header_key(header_value)] = width
+
+        for letter, dim in ws.column_dimensions.items():
+            if dim.width:
+                metadata['column_widths_by_letter'][letter] = dim.width
+
+        # Row heights
+        header_dim = ws.row_dimensions.get(1)
+        if header_dim and header_dim.height:
+            metadata['header_height'] = header_dim.height
+
+        data_height = None
+        for idx in sorted(ws.row_dimensions):
+            if idx > 1:
+                dim = ws.row_dimensions[idx]
+                if dim.height:
+                    data_height = dim.height
+                    break
+        if data_height:
+            metadata['data_height'] = data_height
+
+        # Style samples
+        sample_header = ws['A1']
+        metadata['header_font'] = sample_header.font
+        metadata['header_alignment'] = sample_header.alignment
+        metadata['header_fill'] = sample_header.fill
+
+        if ws.max_row >= 2:
+            sample_data = ws['A2']
+            metadata['data_font'] = sample_data.font
+            metadata['data_alignment'] = sample_data.alignment
+        else:
+            metadata['data_font'] = sample_header.font
+            metadata['data_alignment'] = sample_header.alignment
+
+    except Exception as exc:
+        print(f"Warning: Unable to read formatting from {FORMAT_TEMPLATE_WORKBOOK}: {exc}")
+
+    return metadata
 
 
 @lru_cache(maxsize=None)
@@ -783,31 +882,19 @@ def create_board_member_sheet(wb, df, board_member_name, board_member_col):
             
             if row_fill:
                 cell.fill = row_fill
+        ws.row_dimensions[row_idx].height = data_row_height
     
-    # Apply column widths (same as main sheet)
-    column_widths = {
-        'Finding ID': 18, 'Audit Year': 12, 'Audit ID': 15, 'Audit Title': 45,
-        'Recommendation ID': 25, 'Recommendation Type': 22, 'Recommendation Status': 20,
-        'Severity': 10, 'Finding Title': 55, 'Finding Description': 70,
-        'Recommendation Details': 70, 'Issue Date': 12, 'Initial Deadline': 15,
-        'Current Deadline': 15, 'No. of Deadline Shifts': 18,
-        'Relevant Legal Entities': 50, 'Recommendation Owner - Legal Entity': 35,
-        'Responsible Auditor': 25, 'Audit Lead': 20,
-        'Finding Owner - Responsible Board Member': 40,
-        'Recom Owner - Responsible Board Member': 40,
-        'Recommendation Owner - Division': 30, 'Recommendation Owner - Area': 35,
-        'Recommendation Owner - Managing Director': 35,
-        'Recommendation Owner - Business Unit': 35, 'Management Response': 60,
-        'Risk': 75, 'Recommendation Owner - Head of BU': 30, 'Board member': 60,
-        'Root cause': 35, 'Category': 25, 'Control Environment': 20,
-        'Control Design Effectiveness': 25, 'Control Operating Effectiveness': 28,
-        'M. Graulich': 15, 'D. Senko': 12, 'J. Janka': 12, 'M. Matusza': 15
-    }
-    
+    # Apply column widths based on template workbook where available
+    column_widths_by_header = template_styles.get('column_widths_by_header', {})
+    column_widths_by_letter = template_styles.get('column_widths_by_letter', {})
     for col_idx, header in enumerate(headers, 1):
         col_letter = get_column_letter(col_idx)
-        if header in column_widths:
-            ws.column_dimensions[col_letter].width = column_widths[header]
+        normalized = _normalize_header_key(header)
+        width = column_widths_by_header.get(normalized)
+        if width is None:
+            width = column_widths_by_letter.get(col_letter)
+        if width is not None:
+            ws.column_dimensions[col_letter].width = width
         else:
             ws.column_dimensions[col_letter].width = 20
     
@@ -873,6 +960,7 @@ def write_filtered_data_to_sheet(wb, df, sheet_name, title=None, headers_overrid
     df = populate_board_member_flags(df)
     
     ws = wb.create_sheet(title=sheet_name)
+    template_styles = get_xlsx_template_styles()
     
     # Define styles (same as main sheet)
     header_fill = PatternFill(start_color="A6A6A6", end_color="A6A6A6", fill_type="solid")
@@ -910,9 +998,8 @@ def write_filtered_data_to_sheet(wb, df, sheet_name, title=None, headers_overrid
         cell.alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
     
     header_row_height, template_data_row_height = get_row_heights(template_file)
-    if not header_row_height:
-        header_row_height = 42.0
-    data_row_height = template_data_row_height if template_data_row_height else 54.0
+    header_row_height = template_styles.get('header_height') or header_row_height or 42.0
+    data_row_height = template_styles.get('data_height') or template_data_row_height or 54.0
     ws.sheet_format.defaultRowHeight = data_row_height
     ws.row_dimensions[1].height = header_row_height
     
@@ -1021,51 +1108,16 @@ def write_filtered_data_to_sheet(wb, df, sheet_name, title=None, headers_overrid
         ws.row_dimensions[row_idx].height = data_row_height
     
     # Apply column widths aligned with template
-    default_column_widths = {
-        'Finding ID': 19.33,
-        'Audit Year': 7.87,
-        'Audit ID': 9.07,
-        'Audit Title': 33.6,
-        'Recommendation ID': 14.67,
-        'Recommendation Type': 21.87,
-        'Recommendation Status': 18.13,
-        'Severity': 9.2,
-        'Finding Title': 66.27,
-        'Finding Description': 67.47,
-        'Recommendation Details': 77.87,
-        'Issue Date': 14.53,
-        'Initial Deadline': 10.0,
-        'Current Deadline': 11.07,
-        'No. of Deadline Shifts': 13.87,
-        'Relevant Legal Entities': 33.6,
-        'Recommendation Owner - Legal Entity': 33.6,
-        'Responsible Auditor': 33.6,
-        'Audit Lead': 33.6,
-        'Finding Owner - Responsible Board Member': 33.6,
-        'Recom Owner - Responsible Board Member': 33.6,
-        'Recommendation Owner - Division': 33.6,
-        'Recommendation Owner - Area': 33.6,
-        'Recommendation Owner - Managing Director': 33.6,
-        'Recommendation Owner - Business Unit': 33.6,
-        'Management Response': 33.6,
-        'Risk': 33.6,
-        'Recommendation Owner - Head of BU': 33.6,
-        'Board member': 33.6,
-        'Root cause': 33.6,
-        'Category': 33.6,
-        'Control Environment': 33.6,
-        'Control Design Effectiveness': 33.6,
-        'Control Operating Effectiveness': 33.6,
-        'M. Graulich': 33.6,
-        'D. Senko': 33.6,
-        'J. Janka': 33.6,
-        'M. Matusza': 33.6
-    }
-    
+    column_widths_by_header = template_styles.get('column_widths_by_header', {})
+    column_widths_by_letter = template_styles.get('column_widths_by_letter', {})
     for col_idx, header in enumerate(headers, 1):
         col_letter = get_column_letter(col_idx)
-        fallback_width = default_column_widths.get(header, 20.0)
-        width = get_column_width_for_header(header, fallback_width, template_file)
+        normalized = _normalize_header_key(header)
+        width = column_widths_by_header.get(normalized)
+        if width is None:
+            width = column_widths_by_letter.get(col_letter)
+        if width is None:
+            width = get_column_width_for_header(header, 20.0, template_file)
         ws.column_dimensions[col_letter].width = width
     
     ws.freeze_panes = 'A2'
@@ -1429,6 +1481,7 @@ def create_excel_workbook(df, output_file):
     wb = Workbook()
     ws = wb.active
     ws.title = "ECAG open Recos"
+    template_styles = get_xlsx_template_styles()
     
     # Define styles - match report color scheme
     header_fill = PatternFill(start_color="A6A6A6", end_color="A6A6A6", fill_type="solid")
@@ -1466,12 +1519,10 @@ def create_excel_workbook(df, output_file):
         cell.alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
 
     header_row_height, template_data_row_height = get_row_heights(FORMAT_TEMPLATE_FILE)
-    if not header_row_height:
-        header_row_height = 42.0
-    if not template_data_row_height:
-        template_data_row_height = 90.75
+    header_row_height = template_styles.get('header_height') or header_row_height or 42.0
+    template_data_row_height = template_styles.get('data_height') or template_data_row_height or 90.75
     data_row_height = template_data_row_height
-    ws.sheet_format.defaultRowHeight = 15
+    ws.sheet_format.defaultRowHeight = data_row_height
     ws.row_dimensions[1].height = header_row_height
     
     # Filter out SII recommendations from main ECAG open Recos sheet
@@ -1603,57 +1654,21 @@ def create_excel_workbook(df, output_file):
                 # Apply color coding to each cell in the row
                 if row_fill:
                     cell.fill = row_fill
+            ws.row_dimensions[row_idx].height = data_row_height
 
-    # Adjust column widths for better aesthetics
-    default_column_widths = {
-        'Finding ID': 19.33,
-        'Audit Year': 7.87,
-        'Audit ID': 9.07,
-        'Audit Title': 33.6,
-        'Recommendation ID': 14.67,
-        'Recommendation Type': 21.87,
-        'Recommendation Status': 18.13,
-        'Severity': 9.2,
-        'Finding Title': 66.27,
-        'Finding Description': 67.47,
-        'Recommendation Details': 77.87,
-        'Issue Date': 14.53,
-        'Initial Deadline': 10.0,
-        'Current Deadline': 11.07,
-        'No. of Deadline Shifts': 13.87,
-        'Relevant Legal Entities': 33.6,
-        'Recommendation Owner - Legal Entity': 33.6,
-        'Responsible Auditor': 33.6,
-        'Audit Lead': 33.6,
-        'Finding Owner - Responsible Board Member': 33.6,
-        'Recom Owner - Responsible Board Member': 33.6,
-        'Recommendation Owner - Division': 33.6,
-        'Recommendation Owner - Area': 33.6,
-        'Recommendation Owner - Managing Director': 33.6,
-        'Recommendation Owner - Business Unit': 33.6,
-        'Management Response': 33.6,
-        'Risk': 33.6,
-        'Recommendation Owner - Head of BU': 33.6,
-        'Board member': 33.6,
-        'Root cause': 33.6,
-        'Category': 33.6,
-        'Control Environment': 33.6,
-        'Control Design Effectiveness': 33.6,
-        'Control Operating Effectiveness': 33.6,
-        'M. Graulich': 33.6,
-        'D. Senko': 33.6,
-        'J. Janka': 33.6,
-        'M. Matusza': 33.6
-    }
-    
+    # Adjust column widths to mirror the template workbook
+    column_widths_by_header = template_styles.get('column_widths_by_header', {})
+    column_widths_by_letter = template_styles.get('column_widths_by_letter', {})
     for col_idx, header in enumerate(headers, 1):
         col_letter = get_column_letter(col_idx)
-        fallback_width = default_column_widths.get(header, 20.0)
-        width = get_column_width_for_header(header, fallback_width, FORMAT_TEMPLATE_FILE)
-        ws.column_dimensions[col_letter].width = width
-    
-    for row_idx in range(2, ws.max_row + 1):
-        ws.row_dimensions[row_idx].height = data_row_height
+        normalized = _normalize_header_key(header)
+        width = column_widths_by_header.get(normalized)
+        if width is None:
+            width = column_widths_by_letter.get(col_letter)
+        if width is not None:
+            ws.column_dimensions[col_letter].width = width
+        else:
+            ws.column_dimensions[col_letter].width = get_column_width_for_header(header, 20.0, FORMAT_TEMPLATE_FILE)
     
     # Freeze header row
     ws.freeze_panes = 'A2'
