@@ -669,14 +669,15 @@ def create_board_member_sheet(wb, df, board_member_name, board_member_col):
         severity = str(row.get('Severity', '')).strip().upper()
         current_deadline = row.get('Current Deadline', '')
         is_overdue = False
+        today = pd.Timestamp.now().normalize()
         
         if pd.notna(current_deadline):
             try:
                 if isinstance(current_deadline, str):
-                    deadline_date = pd.to_datetime(current_deadline)
+                    deadline_date = pd.to_datetime(current_deadline).normalize()
                 else:
-                    deadline_date = current_deadline
-                if deadline_date < pd.Timestamp.now():
+                    deadline_date = pd.to_datetime(current_deadline).normalize()
+                if deadline_date <= today:
                     is_overdue = True
             except:
                 pass
@@ -724,13 +725,14 @@ def create_board_member_sheet(wb, df, board_member_name, board_member_col):
         
         current_deadline = row.get('Current Deadline', '')
         is_overdue = False
+        today = pd.Timestamp.now().normalize()
         if pd.notna(current_deadline):
             try:
                 if isinstance(current_deadline, str):
-                    deadline_date = pd.to_datetime(current_deadline)
+                    deadline_date = pd.to_datetime(current_deadline).normalize()
                 else:
-                    deadline_date = current_deadline
-                if deadline_date < pd.Timestamp.now():
+                    deadline_date = pd.to_datetime(current_deadline).normalize()
+                if deadline_date <= today:
                     is_overdue = True
             except:
                 pass
@@ -919,14 +921,15 @@ def write_filtered_data_to_sheet(wb, df, sheet_name, title=None, headers_overrid
         severity = str(row.get('Severity', '')).strip().upper()
         current_deadline = row.get('Current Deadline', '')
         is_overdue = False
+        today = pd.Timestamp.now().normalize()
         
         if pd.notna(current_deadline):
             try:
                 if isinstance(current_deadline, str):
-                    deadline_date = pd.to_datetime(current_deadline)
+                    deadline_date = pd.to_datetime(current_deadline).normalize()
                 else:
-                    deadline_date = current_deadline
-                if deadline_date < pd.Timestamp.now():
+                    deadline_date = pd.to_datetime(current_deadline).normalize()
+                if deadline_date <= today:
                     is_overdue = True
             except:
                 pass
@@ -957,13 +960,14 @@ def write_filtered_data_to_sheet(wb, df, sheet_name, title=None, headers_overrid
         
         current_deadline = row.get('Current Deadline', '')
         is_overdue = False
+        today = pd.Timestamp.now().normalize()
         if pd.notna(current_deadline):
             try:
                 if isinstance(current_deadline, str):
-                    deadline_date = pd.to_datetime(current_deadline)
+                    deadline_date = pd.to_datetime(current_deadline).normalize()
                 else:
-                    deadline_date = current_deadline
-                if deadline_date < pd.Timestamp.now():
+                    deadline_date = pd.to_datetime(current_deadline).normalize()
+                if deadline_date <= today:
                     is_overdue = True
             except:
                 pass
@@ -1117,10 +1121,10 @@ def create_summary_sheet(wb, df):
                     if pd.notna(deadline):
                         try:
                             if isinstance(deadline, str):
-                                deadline_date = pd.to_datetime(deadline)
+                                deadline_date = pd.to_datetime(deadline).normalize()
                             else:
-                                deadline_date = deadline
-                            if deadline_date < pd.Timestamp.now():
+                                deadline_date = pd.to_datetime(deadline).normalize()
+                            if deadline_date <= pd.Timestamp.now().normalize():
                                 overdue += 1
                         except:
                             pass
@@ -1257,10 +1261,10 @@ def create_board_member_dashboard(wb, df, board_member_name, board_member_col):
             if pd.notna(deadline):
                 try:
                     if isinstance(deadline, str):
-                        deadline_date = pd.to_datetime(deadline)
+                        deadline_date = pd.to_datetime(deadline).normalize()
                     else:
-                        deadline_date = deadline
-                    if deadline_date < pd.Timestamp.now():
+                        deadline_date = pd.to_datetime(deadline).normalize()
+                    if deadline_date <= pd.Timestamp.now().normalize():
                         overdue_count += 1
                 except:
                     pass
@@ -1487,15 +1491,16 @@ def create_excel_workbook(df, output_file):
             severity = str(row.get('Severity', '')).strip().upper()
             current_deadline = row.get('Current Deadline', '')
             is_overdue = False
+            today = pd.Timestamp.now().normalize()
             
             # Check if overdue
             if pd.notna(current_deadline):
                 try:
                     if isinstance(current_deadline, str):
-                        deadline_date = pd.to_datetime(current_deadline)
+                        deadline_date = pd.to_datetime(current_deadline).normalize()
                     else:
-                        deadline_date = current_deadline
-                    if deadline_date < pd.Timestamp.now():
+                        deadline_date = pd.to_datetime(current_deadline).normalize()
+                    if deadline_date <= today:
                         is_overdue = True
                 except:
                     pass
@@ -1536,13 +1541,14 @@ def create_excel_workbook(df, output_file):
             # Check if overdue (pink)
             current_deadline = row.get('Current Deadline', '')
             is_overdue = False
+            today = pd.Timestamp.now().normalize()
             if pd.notna(current_deadline):
                 try:
                     if isinstance(current_deadline, str):
-                        deadline_date = pd.to_datetime(current_deadline)
+                        deadline_date = pd.to_datetime(current_deadline).normalize()
                     else:
-                        deadline_date = current_deadline
-                    if deadline_date < pd.Timestamp.now():
+                        deadline_date = pd.to_datetime(current_deadline).normalize()
+                    if deadline_date <= today:
                         is_overdue = True
                 except:
                     pass
