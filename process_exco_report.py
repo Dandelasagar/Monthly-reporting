@@ -36,9 +36,10 @@ MANUAL_ADD_TO_ECAG_IDS = set()
 MANUAL_EXTRA_SII_IDS = MANUAL_SII_IDS
 
 MANUAL_REMOVE_IDS = {
-    '2025-032_F01-A01',
-    '2024-078_F02-A02',
-    '2025-048_F01-A02'
+    '2025-046_F02-A01',
+    '2025-046_F01-A02',
+    '2025-046_F13-A07',
+    '2025-046_F13-A06'
 }
 
 def sanitize_excel_value(value, is_date=False):
