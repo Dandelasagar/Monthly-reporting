@@ -7,7 +7,7 @@ and presents a board-ready experience with interactive filters, KPI tiles,
 visual summaries, persona-focused views, and downloadable extracts.
 
 Run locally with:
-    streamlit run /Users/satyasagardandela/Downloads/monthly\\ Reporting/exco_dashboard_app.py
+    streamlit run /Users/wa569/Downloads/git/Monthly-reportingg/exco_dashboard_app.py
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ st.set_page_config(
 )
 
 
-DATA_FILE = Path("/Users/satyasagardandela/Downloads/monthly Reporting/EXCO_Report_Output.xlsx")
+DATA_FILE = Path("C:/Users/wa569/Git/Monthly-reporting/EXCO_Report_Output.xlsx")
 PRIMARY_SHEET = "ECAG open Recos"
 BOARD_FLAG_COLUMNS: Dict[str, str] = {
     "M. Graulich": "M. Graulich",
