@@ -7,11 +7,15 @@ and presents a board-ready experience with interactive filters, KPI tiles,
 visual summaries, persona-focused views, and downloadable extracts.
 
 Run locally with:
-    streamlit run /Users/wa569/Downloads/git/Monthly-reportingg/exco_dashboard_app.py
+    streamlit run exco_dashboard_app.py
+
+Set the `EXCO_DATA_FILE` environment variable to point to a custom Excel
+output if the default location is not suitable for your deployment target.
 """
 
 from __future__ import annotations
 
+import os
 from datetime import date, datetime
 from functools import lru_cache
 from pathlib import Path
@@ -32,8 +36,12 @@ st.set_page_config(
     },
 )
 
-
-DATA_FILE = Path("C:/Users/wa569/Git/Monthly-reporting/EXCO_Report_Output.xlsx")
+DATA_FILE = Path(
+    os.environ.get(
+        "EXCO_DATA_FILE",
+        Path(__file__).resolve().parent / "EXCO_Report_Output.xlsx",
+    )
+)
 PRIMARY_SHEET = "ECAG open Recos"
 BOARD_FLAG_COLUMNS: Dict[str, str] = {
     "M. Graulich": "M. Graulich",

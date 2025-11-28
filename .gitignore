@@ -1,2 +1,18 @@
+# Java
+target/
+*.class
+*.jar
+.idea/
+*.iml
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS
 .DS_Store
-~$*
+
+# Excel temp files
+~$*.xlsx
+~$*.xls
